@@ -146,18 +146,22 @@ async function rank(id: string): Promise<RankDetail> {
   };
 }
 
-async function playlist(id: string): Promise<PlaylistDetail> {
-  const data = await requestJson<any>(CDN + '/special/song?specialid=' + encodeURIComponent(id) + '&page=1&pagesize=50&format=json', CDN_OPTIONS);
+async function playlist(id: string, page: number, size: number): Promise<PlaylistDetail> {
+  const data = await requestJson<any>(CDN + '/special/song?specialid=' + encodeURIComponent(id) + '&page=' + page + '&pagesize=' + size + '&format=json', CDN_OPTIONS);
   const info = await requestJson<any>(CDN + '/special/info?specialid=' + encodeURIComponent(id) + '&format=json', CDN_OPTIONS);
   const meta = info?.data ?? {};
   const songs = list<any>(data?.data?.info).map(toSong);
+  const total = num(meta?.songcount, num(data?.data?.total, songs.length));
   return {
     source: 'kugou',
     id,
     name: cleanText(meta?.specialname),
     cover: imageUrl(meta?.imgurl),
     creator: cleanText(meta?.nickname) || undefined,
-    count: num(meta?.songcount, num(data?.data?.total, songs.length)),
+    count: total,
+    page,
+    size,
+    total,
     song: songs,
   };
 }

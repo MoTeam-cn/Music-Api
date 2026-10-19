@@ -632,3 +632,4 @@ export interface Provider {
 9. 网易搜索接口不返回封面，搜索后用详情接口批量补齐（一次额外请求，失败降级）；酷狗歌单/专辑用 `special/info`、`album/info` 补名称与封面；榜单补 `cover`。
 10. 百度公开歌单页当前无数据，歌单能力保持关闭；酷狗歌单内单曲不返回封面（接口限制）。
 11. 缓存层升级：TTL + LRU 基础上加 stale-while-revalidate（30s）与 singleflight（并发去重）；HTTP 层按 TTL 输出 Cache-Control/s-maxage 与 X-Cache，静态资源带 ETag/Last-Modified 并支持 304，响应支持 gzip 与 HEAD。
+12. 歌单增强：playlist 支持 page/size 分页（默认 50，最大 100）与 with_url=1（网易/QQ 走批量取地址接口，酷狗/百度并发单曲补；VIP/付费为 null）；返回 page/size/total/hasMore，with_url 结果缓存 60s。

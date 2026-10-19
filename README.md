@@ -56,7 +56,7 @@ npm start
 | `/v1/lyric` | `source`、`id` | LRC 歌词 |
 | `/v1/album` | `source`、`id` | 专辑详情 + 曲目 |
 | `/v1/artist` | `source`、`id` | 歌手 + 热门曲目 |
-| `/v1/playlist` | `source`、`id` | 歌单详情 + 曲目（歌单播放器主接口） |
+| `/v1/playlist` | `source`、`id`、`page`、`size`、`with_url`、`quality` | 歌单详情 + 曲目，支持分页；`with_url=1` 直接带播放地址 |
 | `/v1/rank` | `source`、`id`（可省） | 不带 id 返回榜单列表，带 id 返回榜单详情 |
 | `/v1/source` | — | 四源能力矩阵 + 禁用列表 |
 | `/v1/status` | — | 版本、运行时长、缓存命中、免责声明摘要 |
@@ -76,12 +76,22 @@ curl 'http://127.0.0.1:8802/v1/search?q=晴天&source=netease&size=5'
 ### 歌单播放器
 
 ```bash
-# 1. 传歌单 ID 拿歌单（含封面、曲目、可播标记）
-curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678'
+# 分页：第 1 页，每页 50（默认 size=50，最大 100）
+curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=1&size=50'
 
-# 2. 逐首取播放地址（VIP/付费返回 3002，跳过即可）
-curl 'http://127.0.0.1:8802/v1/song/url?source=netease&id=2652820720'
+# 第 2 页
+curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=2&size=50'
+
+# 直接带播放地址：with_url=1（免费曲目才有；VIP/付费为 null）
+curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=1&size=20&with_url=1'
 ```
+
+- `with_url=1`：在歌单响应里直接给每首可播歌曲补 `url`，前端播放器不用再逐首请求。
+  - 网易 / QQ 走批量接口（一次请求解决整页）；酷狗 / 百度按并发单曲补齐（并发 6）。
+  - VIP / 付费 / 无版权曲目 `url` 为 `null`，`available:false`、`vip:true`，**不需要付费，但这类歌拿不到地址**。
+  - 结果只缓存 60s（直链有时效），普通歌单缓存 5min。
+- 分页字段：`page`、`size`、`total`、`hasMore`；`page*size < total` 时 `hasMore=true`。
+- 不想一次拿地址就仍用单曲接口：`/v1/song/url`。
 
 歌单 ID 直接从各平台网页 URL 里取：
 
@@ -297,7 +307,7 @@ Dockerfile / docker-compose.yml / .github/workflows/ghcr.yml  容器化与镜像
 ```bash
 npm start          # 启动
 npm run dev        # 热重载
-npm test           # 30 项单测，不联网
+npm test           # 33 项单测，不联网
 npm run check      # tsc --noEmit
 npm run probe      # 打真网探测四源能力（需要网络）
 ```

@@ -162,6 +162,25 @@ test('json and static bodies are gzipped when accepted', async () => {
   }
 });
 
+test('playlist validates paging params and rejects unsupported source', async () => {
+  const app = await start();
+  try {
+    const badPage = await fetch(app.base + '/v1/playlist?source=netease&id=1&page=0');
+    assert.equal(badPage.status, 400);
+    assert.equal((await badPage.json() as any).code, 1001);
+
+    const badSize = await fetch(app.base + '/v1/playlist?source=netease&id=1&size=101');
+    assert.equal(badSize.status, 400);
+    assert.equal((await badSize.json() as any).code, 1001);
+
+    const unsupported = await fetch(app.base + '/v1/playlist?source=baidu&id=1');
+    assert.equal(unsupported.status, 400);
+    assert.equal((await unsupported.json() as any).code, 1003);
+  } finally {
+    await app.close();
+  }
+});
+
 test('rate limit returns 429 with code 4001', async () => {
   const app = await start({ RATE_LIMIT: '1', RATE_BURST: '0' });
   try {

@@ -106,7 +106,8 @@ export function createApp(config: Config): Server {
     pending
       .then((result) => {
         if (result.raw === undefined) {
-          cache.set(cacheKey, { data: result.data, source: result.source }, ttlMs, STALE_WINDOW);
+          const ttl = result.ttlMs ?? ttlMs;
+          cache.set(cacheKey, { data: result.data, source: result.source, ttlMs: ttl }, ttl, STALE_WINDOW);
         }
       })
       .catch(() => {
@@ -180,8 +181,8 @@ export function createApp(config: Config): Server {
 
     const ttl = ttlFor(pathname);
     const cacheKey = cacheKeyOf(pathname, url.searchParams);
-    const cacheControl = cacheControlFor(ttl);
-    const entry = cache.getWithMeta(cacheKey) as { value: { data: unknown; source?: Source }; stale: boolean } | undefined;
+    type Cached = { data: unknown; source?: Source; ttlMs: number };
+    const entry = cache.getWithMeta(cacheKey) as { value: Cached; stale: boolean } | undefined;
 
     if (entry !== undefined) {
       const cached = entry.value;
@@ -190,7 +191,7 @@ export function createApp(config: Config): Server {
         startFetch(cacheKey, match.route, ctx, ttl).catch(() => cache.delete(cacheKey));
       }
       done(0, 'ok', cached.data, cached.source, 0, {
-        cacheControl,
+        cacheControl: cacheControlFor(cached.ttlMs),
         cacheState: entry.stale ? 'STALE' : 'HIT',
       });
       return;
@@ -208,7 +209,7 @@ export function createApp(config: Config): Server {
           return;
         }
         done(0, 'ok', result.data, result.source, shared ? 0 : Date.now() - fetchStarted, {
-          cacheControl,
+          cacheControl: cacheControlFor(result.ttlMs ?? ttl),
           cacheState: shared ? 'SHARED' : 'MISS',
         });
       })

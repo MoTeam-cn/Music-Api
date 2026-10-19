@@ -17,6 +17,8 @@ export interface Song {
   cover?: string;
   available: boolean;
   vip: boolean;
+  /** 仅 playlist?with_url=1 时填充；不可播为 null */
+  url?: string | null;
 }
 
 export interface SongDetail extends Song {
@@ -66,6 +68,10 @@ export interface PlaylistDetail {
   cover?: string;
   creator?: string;
   count: number;
+  page: number;
+  size: number;
+  total: number;
+  hasMore?: boolean;
   song: Song[];
 }
 

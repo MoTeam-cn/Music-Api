@@ -18,6 +18,8 @@ export interface RouteResult {
   data?: unknown;
   source?: Source;
   raw?: RawResult;
+  /** 覆盖该路由默认缓存时长（如 with_url 结果只缓存 60s） */
+  ttlMs?: number;
 }
 
 export type RouteHandler = (ctx: RouteContext) => Promise<RouteResult>;

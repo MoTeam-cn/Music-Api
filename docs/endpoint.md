@@ -38,7 +38,7 @@
 | url | `GET m.kugou.com/app/i/getSongInfo.php?cmd=playInfo` | ✅ | 老播放接口；VIP 无 url |
 | lyric | `krcs.kugou.com/search` + `lyrics.kugou.com/download` | ✅ | 返回 base64 lrc |
 | rank | `http://mobilecdn.kugou.com/api/v3/rank/*` | ✅ | 该域名 HTTPS 证书不匹配，走 HTTP |
-| playlist | `special/song` + `special/info` | ✅ | 歌单名/封面/创建者取自 special/info |
+| playlist | `special/song` + `special/info` | ✅ | 歌单名/封面/创建者取自 special/info；page/pagesize 直接分页 |
 | album | `album/song` + `album/info` | ✅ | 专辑名/歌手/封面取自 album/info |
 | artist | `http://mobilecdn.kugou.com/api/v3/singer/*` | ✅ | info + song |
 

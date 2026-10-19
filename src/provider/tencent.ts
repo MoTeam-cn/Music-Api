@@ -78,6 +78,31 @@ async function url(id: string, quality: Quality): Promise<SongUrl> {
   return { source: 'tencent', id, url: sip + purl, quality, bitrate: quality === 'high' ? 320 : 128 };
 }
 
+async function urls(ids: string[], quality: Quality): Promise<Map<string, SongUrl | null>> {
+  const guid = String(Math.floor(Math.random() * 1000000000));
+  const data = await musicu('vkey.GetVkeyServer', 'CgiGetVkey', {
+    guid,
+    songmid: ids,
+    songtype: ids.map(() => 0),
+    uin: '0',
+    loginflag: 1,
+    platform: '20',
+  });
+  const sip = list<string>(data?.sip)[0] ?? 'https://dl.stream.qqmusic.qq.com/';
+  const out = new Map<string, SongUrl | null>();
+  list<any>(data?.midurlinfo).forEach((info: any, index: number) => {
+    const id = str(info?.songmid) || ids[index] || '';
+    if (id === '') return;
+    const purl = str(info?.purl);
+    if (purl === '') {
+      out.set(id, null);
+      return;
+    }
+    out.set(id, { source: 'tencent', id, url: sip + purl, quality, bitrate: quality === 'high' ? 320 : 128 });
+  });
+  return out;
+}
+
 async function lyric(id: string): Promise<Lyric> {
   const data = await requestJson<any>(C + '/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=' + encodeURIComponent(id) + '&format=json&nobase64=1', {
     headers: { ...HEADERS, Referer: 'https://y.qq.com/portal/player.html' },
@@ -103,19 +128,25 @@ async function album(id: string): Promise<AlbumDetail> {
   };
 }
 
-async function playlist(id: string): Promise<PlaylistDetail> {
+async function playlist(id: string, page: number, size: number): Promise<PlaylistDetail> {
   const url = C + '/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg?type=1&json=1&utf8=1&onlysong=0&disstid=' + encodeURIComponent(id) + '&format=json';
   const data = await requestJson<any>(url, { headers: HEADERS });
   const item = list<any>(data?.cdlist)[0];
   if (item === undefined) fail(Code.notFound, 'playlist not found');
+  const all = list<any>(item?.songlist).map(toSong);
+  const total = num(item?.songnum, all.length);
+  const start = (page - 1) * size;
   return {
     source: 'tencent',
     id,
     name: cleanText(item?.dissname),
     cover: str(item?.logo) || undefined,
     creator: cleanText(item?.nickname) || undefined,
-    count: num(item?.songnum, list<any>(item?.songlist).length),
-    song: list<any>(item?.songlist).map(toSong),
+    count: total,
+    page,
+    size,
+    total,
+    song: all.slice(start, start + size),
   };
 }
 

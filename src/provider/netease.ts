@@ -103,6 +103,32 @@ async function url(id: string, quality: Quality): Promise<SongUrl> {
   };
 }
 
+async function urls(ids: string[], quality: Quality): Promise<Map<string, SongUrl | null>> {
+  const br = BITRATE[quality];
+  const data = await requestJson<any>(BASE + '/api/song/enhance/player/url?ids=[' + ids.map((id) => encodeURIComponent(id)).join(',') + ']&br=' + br, { headers: HEADERS });
+  const out = new Map<string, SongUrl | null>();
+  for (const item of list<any>(data?.data)) {
+    const id = str(item?.id);
+    if (id === '') continue;
+    const link = str(item?.url);
+    const trial = item?.freeTrialInfo !== null && item?.freeTrialInfo !== undefined;
+    if (link === '' || trial || !isFree(item?.fee)) {
+      out.set(id, null);
+      continue;
+    }
+    out.set(id, {
+      source: 'netease',
+      id,
+      url: link,
+      quality,
+      bitrate: Math.round(num(item?.br, br) / 1000),
+      size: num(item?.size) || undefined,
+      expireAt: num(item?.expi) || undefined,
+    });
+  }
+  return out;
+}
+
 async function lyric(id: string): Promise<Lyric> {
   const data = await requestJson<any>(BASE + '/api/song/lyric?id=' + encodeURIComponent(id) + '&lv=-1&kv=-1&tv=-1', { headers: HEADERS });
   const text = str(data?.lrc?.lyric);
@@ -140,7 +166,7 @@ async function artist(id: string): Promise<ArtistDetail> {
   };
 }
 
-async function playlist(id: string): Promise<PlaylistDetail> {
+async function playlist(id: string, page: number, size: number): Promise<PlaylistDetail> {
   const data = await requestJson<any>(BASE + '/api/v6/playlist/detail', {
     method: 'POST',
     headers: { ...HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -148,15 +174,21 @@ async function playlist(id: string): Promise<PlaylistDetail> {
   });
   const item = data?.playlist;
   if (item === undefined) fail(Code.notFound, 'playlist not found');
-  const ids = list<any>(item?.trackIds).slice(0, 100).map((entry: any) => str(entry?.id)).filter((v: string) => v !== '');
-  const songs = ids.length > 0 ? await fetchSongs(ids) : list<any>(item?.tracks).map(toSong);
+  const trackIds = list<any>(item?.trackIds).map((entry: any) => str(entry?.id)).filter((v: string) => v !== '');
+  const total = num(item?.trackCount, trackIds.length);
+  const start = (page - 1) * size;
+  const ids = trackIds.slice(start, start + size);
+  const songs = ids.length > 0 ? await fetchSongs(ids) : list<any>(item?.tracks).slice(0, size).map(toSong);
   return {
     source: 'netease',
     id,
     name: cleanText(item?.name),
     cover: str(item?.coverImgUrl) || undefined,
     creator: cleanText(item?.creator?.nickname) || undefined,
-    count: num(item?.trackCount, songs.length),
+    count: total,
+    page,
+    size,
+    total,
     song: songs,
   };
 }
@@ -173,7 +205,7 @@ async function rankList(): Promise<RankItem[]> {
 }
 
 async function rank(id: string): Promise<RankDetail> {
-  const detail = await playlist(id);
+  const detail = await playlist(id, 1, 100);
   return { source: 'netease', id, name: detail.name, cover: detail.cover, song: detail.song };
 }
 

@@ -53,7 +53,7 @@ async function probeSource(provider: Provider): Promise<void> {
   const playlist = provider.playlist;
   const playlistId = fixture.playlist;
   if (provider.capability.playlist && playlist !== undefined && playlistId !== undefined) {
-    await timed('playlist', () => playlist(playlistId), (item) => 'n=' + item.song.length);
+    await timed('playlist', () => playlist(playlistId, 1, 50), (item) => 'n=' + item.song.length + ' total=' + item.total);
   }
 
   const rankList = provider.rankList;

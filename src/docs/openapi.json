@@ -3,7 +3,7 @@
   "info": {
     "title": "music-api",
     "version": "0.1.0",
-    "description": "公开音乐元数据聚合接口（网易云 / QQ 音乐 / 酷狗 / 百度音乐）。只读、零运行时依赖、支持 JSONP，不设 CORS。仅供技术研究与学习，不提供 VIP/付费内容。",
+    "description": "公开音乐元数据聚合接口（网易云 / QQ 音乐 / 酷狗 / 百度音乐）。只读、零运行时依赖、支持 JSONP，不设 CORS。所有 /v1 接口必须携带 origin；常见 HTTP 库默认 UA 会被拦截。仅供技术研究与学习，不提供 VIP/付费内容。",
     "license": {
       "name": "MIT (code only)"
     }
@@ -100,6 +100,18 @@
               "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
             },
             "description": "JSONP 回调名；别名 cb"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
           }
         ],
         "responses": {
@@ -121,6 +133,16 @@
           },
           "400": {
             "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
             "content": {
               "application/json": {
                 "schema": {
@@ -182,6 +204,18 @@
               "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
             },
             "description": "JSONP 回调名；别名 cb"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
           }
         ],
         "responses": {
@@ -203,6 +237,16 @@
           },
           "400": {
             "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
             "content": {
               "application/json": {
                 "schema": {
@@ -278,6 +322,18 @@
               "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
             },
             "description": "JSONP 回调名；别名 cb"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
           }
         ],
         "responses": {
@@ -298,7 +354,7 @@
             }
           },
           "403": {
-            "description": "仅 VIP / 付费 / 无版权",
+            "description": "UA 被拦截（4002）",
             "content": {
               "application/json": {
                 "schema": {
@@ -360,6 +416,18 @@
               "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
             },
             "description": "JSONP 回调名；别名 cb"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
           }
         ],
         "responses": {
@@ -375,6 +443,16 @@
                 "schema": {
                   "type": "string",
                   "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             }
@@ -432,6 +510,18 @@
               "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
             },
             "description": "JSONP 回调名；别名 cb"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
           }
         ],
         "responses": {
@@ -453,6 +543,16 @@
           },
           "400": {
             "description": "该源不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
             "content": {
               "application/json": {
                 "schema": {
@@ -514,6 +614,18 @@
               "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
             },
             "description": "JSONP 回调名；别名 cb"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
           }
         ],
         "responses": {
@@ -535,6 +647,16 @@
           },
           "400": {
             "description": "该源不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
             "content": {
               "application/json": {
                 "schema": {
@@ -602,20 +724,6 @@
             "description": "每页数量"
           },
           {
-            "name": "with_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "0",
-                "1"
-              ],
-              "default": "0"
-            },
-            "description": "为 1 时直接为每首可播歌曲补 url（VIP/付费为 null），结果缓存 60s"
-          },
-          {
             "name": "quality",
             "in": "query",
             "required": false,
@@ -637,6 +745,18 @@
               "type": "string"
             },
             "description": "JSONP 回调名"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
           }
         ],
         "responses": {
@@ -658,6 +778,16 @@
           },
           "400": {
             "description": "该源不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
             "content": {
               "application/json": {
                 "schema": {
@@ -718,6 +848,18 @@
               "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
             },
             "description": "JSONP 回调名；别名 cb"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
           }
         ],
         "responses": {
@@ -739,6 +881,16 @@
           },
           "400": {
             "description": "该源不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
             "content": {
               "application/json": {
                 "schema": {
@@ -772,8 +924,32 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
+          }
+        ]
       }
     },
     "/v1/status": {
@@ -798,8 +974,32 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "UA 被拦截（4002）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "origin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._:/-]{1,64}$"
+            },
+            "description": "调用来源标识（必填），如 web / app-ios / example.com；用于日志与统计"
+          }
+        ]
       }
     }
   },
@@ -879,11 +1079,6 @@
           "vip": {
             "type": "boolean",
             "description": "是否 VIP/付费（仅提示，不提供地址）"
-          },
-          "url": {
-            "type": "string",
-            "nullable": true,
-            "description": "仅 playlist?with_url=1 时出现；不可播为 null"
           }
         }
       },

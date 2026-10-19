@@ -18,7 +18,7 @@
 <li><code>GET /v1/lyric</code> — LRC 歌词，参数 source、id</li>
 <li><code>GET /v1/album</code> — 专辑详情，参数 source、id</li>
 <li><code>GET /v1/artist</code> — 歌手与热门曲目，参数 source、id</li>
-<li><code>GET /v1/playlist</code> — 歌单详情与曲目，参数 source、id、page、size、with_url（=1 直接带播放地址）、quality</li>
+<li><code>GET /v1/playlist</code> — 歌单详情与曲目，参数 source、id、page、size（每首带 available / vip 标记）</li>
 <li><code>GET /v1/rank</code> — 榜单列表 / 榜单详情，参数 source、id（可省）</li>
 <li><code>GET /v1/source</code> — 四源能力矩阵</li>
 <li><code>GET /v1/status</code> — 版本与运行状态</li>
@@ -28,9 +28,11 @@
 
 <h2>示例</h2>
 <p>JSON：</p>
-<pre>GET /v1/search?q=晴天&amp;source=netease&amp;size=5
-GET /v1/playlist?source=netease&amp;id=3778678
-GET /v1/song/url?source=netease&amp;id=2652820720</pre>
+<pre>GET /v1/search?q=晴天&amp;source=netease&amp;size=5&amp;origin=web
+GET /v1/playlist?source=netease&amp;id=3778678&amp;page=1&amp;size=50&amp;origin=web
+GET /v1/song/url?source=netease&amp;id=2652820720&amp;origin=web</pre>
+<p><strong>所有 /v1 接口必须带 origin</strong>（如 origin=web / origin=app-ios），用于区分来源；缺失返回 1001。静态页与 /openapi.json 不要求。</p>
+<p><strong>UA 过滤</strong>：okhttp / python-requests / axios / undici / postman 等库默认 UA 会被拦截（4002 / 403），浏览器与 curl/wget 正常。</p>
 <p>JSONP（浏览器跨域，本服务不设 CORS 头，只能用 JSONP）：</p>
 <pre>&lt;script&gt;
   function onSearch(res) {
@@ -38,12 +40,12 @@ GET /v1/song/url?source=netease&amp;id=2652820720</pre>
     console.log(res.data.list);
   }
 &lt;/script&gt;
-&lt;script src="/v1/search?q=晴天&amp;source=netease&amp;callback=onSearch"&gt;&lt;/script&gt;</pre>
-<p>jQuery：<code>$.ajax({ url: '/v1/search', dataType: 'jsonp', data: { q: '晴天' } })</code></p>
+&lt;script src="/v1/search?q=晴天&amp;source=netease&amp;callback=onSearch&amp;origin=web"&gt;&lt;/script&gt;</pre>
+<p>jQuery：<code>$.ajax({ url: '/v1/search', dataType: 'jsonp', data: { q: '晴天', origin: 'web' } })</code></p>
 
 <h2>响应</h2>
 <pre>{ "code": 0, "message": "ok", "data": {}, "source": "netease", "cost": 137 }</pre>
-<p>错误码：1001 参数 · 1002 源 · 1003 能力 · 1004 方法 · 2001 超时 · 2002 上游 · 2003 解析 · 3001 不存在 · 3002 VIP/付费 · 4001 限流 · 5000 内部。JSONP 模式下 HTTP 恒为 200，错误只看 code。</p>
+<p>错误码：1001 参数 · 1002 源 · 1003 能力 · 1004 方法 · 2001 超时 · 2002 上游 · 2003 解析 · 3001 不存在 · 3002 VIP/付费 · 4001 限流 · 4002 UA 被拦截 · 5000 内部。JSONP 模式下 HTTP 恒为 200，错误只看 code。</p>
 
 <h2>说明</h2>
 <ul>

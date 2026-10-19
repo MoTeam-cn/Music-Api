@@ -17,6 +17,6 @@ USER node
 EXPOSE 8802
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:8802/v1/status >/dev/null || exit 1
+  CMD wget -qO- "http://127.0.0.1:8802/v1/status?origin=healthcheck" >/dev/null || exit 1
 
 CMD ["node", "src/main.ts"]

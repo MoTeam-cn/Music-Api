@@ -24,6 +24,8 @@ import { songRoute, songUrlRoute } from './route/song.ts';
 import { sourceRoute } from './route/source.ts';
 import { statusRoute } from './route/status.ts';
 
+const ORIGIN_RE = /^[A-Za-z0-9._:/-]{1,64}$/;
+
 const TTL_SEARCH = 60000;
 const TTL_URL = 60000;
 const TTL_LYRIC = 3600000;
@@ -79,7 +81,7 @@ function clientIp(req: IncomingMessage, config: Config): string {
 function cacheKeyOf(pathname: string, params: URLSearchParams): string {
   const entries: Array<[string, string]> = [];
   for (const [key, value] of params) {
-    if (key === 'callback' || key === 'cb') continue;
+    if (key === 'callback' || key === 'cb' || key === 'origin') continue;
     entries.push([key, value]);
   }
   entries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
@@ -89,6 +91,13 @@ function cacheKeyOf(pathname: string, params: URLSearchParams): string {
 function headerValue(req: IncomingMessage, name: string): string | undefined {
   const value = req.headers[name];
   return typeof value === 'string' ? value : undefined;
+}
+
+function uaBlocked(ua: string, block: string[]): boolean {
+  const raw = ua.trim();
+  if (raw === '') return true;
+  const lower = raw.toLowerCase();
+  return block.some((token) => lower.includes(token));
 }
 
 export function createApp(config: Config): Server {
@@ -128,14 +137,21 @@ export function createApp(config: Config): Server {
     const head = req.method === 'HEAD';
     const method = head ? 'GET' : (req.method ?? 'GET');
     const acceptEncoding = headerValue(req, 'accept-encoding');
+    const ua = headerValue(req, 'user-agent') ?? '';
+    const origin = (url.searchParams.get('origin') ?? '').trim();
 
     function done(code: number, message: string, data: unknown, source: Source | undefined, cost: number, opts: SendOptions = {}): void {
       send(res, { code, message, data, source, cost }, callback, { head, acceptEncoding, ...opts });
-      logger.info('request', { route: pathname, code, ms: Date.now() - startedAt, ip: ipKey, cache: opts.cacheState });
+      logger.info('request', { route: pathname, code, ms: Date.now() - startedAt, ip: ipKey, origin: origin === '' ? undefined : origin, cache: opts.cacheState });
     }
 
     function fail(code: number, message: string): void {
       done(code, message, null, undefined, 0, { cacheControl: 'no-store' });
+    }
+
+    if (config.uaFilter && uaBlocked(ua, config.uaBlock)) {
+      fail(Code.blocked, 'client blocked');
+      return;
     }
 
     if (!limiter.take(ip)) {
@@ -150,6 +166,11 @@ export function createApp(config: Config): Server {
     }
     if (match.kind === 'methodNotAllowed') {
       fail(Code.method, 'method not allowed');
+      return;
+    }
+
+    if (match.route.raw !== true && config.requireOrigin && !ORIGIN_RE.test(origin)) {
+      fail(Code.param, 'missing or invalid param: origin');
       return;
     }
 

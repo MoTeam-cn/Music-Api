@@ -12,6 +12,7 @@ export const Code = {
   notFound: 3001,
   vip: 3002,
   rate: 4001,
+  blocked: 4002,
   internal: 5000,
 } as const;
 
@@ -27,6 +28,7 @@ const HTTP_STATUS: Record<number, number> = {
   3001: 404,
   3002: 403,
   4001: 429,
+  4002: 403,
   5000: 500,
 };
 

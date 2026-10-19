@@ -103,32 +103,6 @@ async function url(id: string, quality: Quality): Promise<SongUrl> {
   };
 }
 
-async function urls(ids: string[], quality: Quality): Promise<Map<string, SongUrl | null>> {
-  const br = BITRATE[quality];
-  const data = await requestJson<any>(BASE + '/api/song/enhance/player/url?ids=[' + ids.map((id) => encodeURIComponent(id)).join(',') + ']&br=' + br, { headers: HEADERS });
-  const out = new Map<string, SongUrl | null>();
-  for (const item of list<any>(data?.data)) {
-    const id = str(item?.id);
-    if (id === '') continue;
-    const link = str(item?.url);
-    const trial = item?.freeTrialInfo !== null && item?.freeTrialInfo !== undefined;
-    if (link === '' || trial || !isFree(item?.fee)) {
-      out.set(id, null);
-      continue;
-    }
-    out.set(id, {
-      source: 'netease',
-      id,
-      url: link,
-      quality,
-      bitrate: Math.round(num(item?.br, br) / 1000),
-      size: num(item?.size) || undefined,
-      expireAt: num(item?.expi) || undefined,
-    });
-  }
-  return out;
-}
-
 async function lyric(id: string): Promise<Lyric> {
   const data = await requestJson<any>(BASE + '/api/song/lyric?id=' + encodeURIComponent(id) + '&lv=-1&kv=-1&tv=-1', { headers: HEADERS });
   const text = str(data?.lrc?.lyric);

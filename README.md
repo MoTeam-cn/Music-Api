@@ -11,7 +11,7 @@
 
 ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![node](https://img.shields.io/badge/node-%3E%3D24-brightgreen)
-![tests](https://img.shields.io/badge/tests-26%20passing-success)
+![tests](https://img.shields.io/badge/tests-33%20passing-success)
 
 ---
 
@@ -42,6 +42,33 @@ npm start
 
 运行不需要 `npm install`；`devDependencies` 只用于类型检查与测试。
 
+## 请求要求
+
+### origin（必填）
+
+所有 `/v1` 接口**必须**带 `origin` 参数，用于区分调用来源、方便日志与统计：
+
+```bash
+curl 'http://127.0.0.1:8802/v1/search?q=晴天&origin=web'
+```
+
+- 取值：1~64 个字符，允许字母、数字、`.` `_` `-` `:` `/`（如 `web`、`app-ios`、`example.com`）。
+- 缺失或格式非法返回 `1001`；静态页 `/` 与 `/openapi.json` 不要求。
+- `origin` 不参与缓存键，不会造成缓存碎片。
+
+### UA 过滤
+
+默认拦截常见 HTTP 客户端库的默认 UA（空 UA 也拦），返回 `4002` / HTTP `403`：
+
+```
+okhttp  python-requests  python-urllib  aiohttp  scrapy  go-http-client
+java/   libwww-perl      node-fetch     undici   axios   postmanruntime
+insomnia  httpie          reqwest        dart:io
+```
+
+- 浏览器（含 JSONP）正常放行；`curl` / `wget` 保留，方便调试和容器健康检查。
+- 自定义：`UA_BLOCK="okhttp,curl"` 覆盖默认列表；`UA_FILTER=0` 关闭过滤；`ORIGIN_REQUIRED=0` 关闭 origin 校验。
+
 ---
 
 ## 接口
@@ -56,7 +83,7 @@ npm start
 | `/v1/lyric` | `source`、`id` | LRC 歌词 |
 | `/v1/album` | `source`、`id` | 专辑详情 + 曲目 |
 | `/v1/artist` | `source`、`id` | 歌手 + 热门曲目 |
-| `/v1/playlist` | `source`、`id`、`page`、`size`、`with_url`、`quality` | 歌单详情 + 曲目，支持分页；`with_url=1` 直接带播放地址 |
+| `/v1/playlist` | `source`、`id`、`page`、`size` | 歌单详情 + 曲目，支持分页；每首带 `available` / `vip` 标记 |
 | `/v1/rank` | `source`、`id`（可省） | 不带 id 返回榜单列表，带 id 返回榜单详情 |
 | `/v1/source` | — | 四源能力矩阵 + 禁用列表 |
 | `/v1/status` | — | 版本、运行时长、缓存命中、免责声明摘要 |
@@ -70,28 +97,32 @@ npm start
 ### 搜索
 
 ```bash
-curl 'http://127.0.0.1:8802/v1/search?q=晴天&source=netease&size=5'
+curl 'http://127.0.0.1:8802/v1/search?q=晴天&source=netease&size=5&origin=web'
 ```
 
 ### 歌单播放器
 
 ```bash
-# 分页：第 1 页，每页 50（默认 size=50，最大 100）
-curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=1&size=50'
+# 第 1 页，每页 50（默认 size=50，最大 100）
+curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=1&size=50&origin=web'
 
 # 第 2 页
-curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=2&size=50'
-
-# 直接带播放地址：with_url=1（免费曲目才有；VIP/付费为 null）
-curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=1&size=20&with_url=1'
+curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=2&size=50&origin=web'
 ```
 
-- `with_url=1`：在歌单响应里直接给每首可播歌曲补 `url`，前端播放器不用再逐首请求。
-  - 网易 / QQ 走批量接口（一次请求解决整页）；酷狗 / 百度按并发单曲补齐（并发 6）。
-  - VIP / 付费 / 无版权曲目 `url` 为 `null`，`available:false`、`vip:true`，**不需要付费，但这类歌拿不到地址**。
-  - 结果只缓存 60s（直链有时效），普通歌单缓存 5min。
+每首歌都带播放标记，前端可以**先过滤再决定要不要请求地址**：
+
+| 字段 | 含义 |
+|---|---|
+| `available` | 是否公开可播；`false` 就别去请求地址 |
+| `vip` | 是否需要会员 / 付费（VIP、数字专辑、付费单曲） |
+
+```json
+{ "name": "我不难过", "available": false, "vip": true }
+```
+
 - 分页字段：`page`、`size`、`total`、`hasMore`；`page*size < total` 时 `hasMore=true`。
-- 不想一次拿地址就仍用单曲接口：`/v1/song/url`。
+- 只取列表不消耗播放地址；真要播放时再调 `/v1/song/url`（VIP/付费返回 `3002`）。
 
 歌单 ID 直接从各平台网页 URL 里取：
 
@@ -111,10 +142,10 @@ curl 'http://127.0.0.1:8802/v1/playlist?source=netease&id=3778678&page=1&size=20
     console.log(res.data.list);
   }
 </script>
-<script src="http://127.0.0.1:8802/v1/search?q=晴天&source=netease&callback=onSearch"></script>
+<script src="http://127.0.0.1:8802/v1/search?q=晴天&source=netease&callback=onSearch&origin=web"></script>
 ```
 
-jQuery 直接可用：`$.ajax({ url: '/v1/search', dataType: 'jsonp', data: { q: '晴天' } })`。
+jQuery 直接可用：`$.ajax({ url: '/v1/search', dataType: 'jsonp', data: { q: '晴天', origin: 'web' } })`。
 
 > 本服务不设 CORS 头，跨域只能用 JSONP。回调名有白名单校验，非法回调返回 `1001`。
 
@@ -134,7 +165,7 @@ jQuery 直接可用：`$.ajax({ url: '/v1/search', dataType: 'jsonp', data: { q:
 | `source` | 命中的源（聚合搜索省略） |
 | `cost` | 上游耗时 ms，缓存命中为 0 |
 
-错误码：`1001` 参数 · `1002` 源 · `1003` 能力 · `1004` 方法 · `2001` 超时 · `2002` 上游 · `2003` 解析 · `3001` 不存在 · `3002` VIP/付费 · `4001` 限流 · `5000` 内部。
+错误码：`1001` 参数 · `1002` 源 · `1003` 能力 · `1004` 方法 · `2001` 超时 · `2002` 上游 · `2003` 解析 · `3001` 不存在 · `3002` VIP/付费 · `4001` 限流 · `4002` UA 被拦截 · `5000` 内部。
 
 JSONP 模式下 HTTP 恒为 `200`（`<script>` 不看状态码），错误只看 `code`。
 
@@ -181,6 +212,9 @@ JSONP 模式下 HTTP 恒为 `200`（`<script>` 不看状态码），错误只看
 | `CACHE_MAX` | 500 | 缓存条数上限 |
 | `SOURCE_DISABLE` | 空 | 逗号分隔，临时下线某源（如 `baidu`） |
 | `TRUST_PROXY` | 0 | 是否采信 X-Forwarded-For |
+| `ORIGIN_REQUIRED` | 1 | 是否强制 origin 参数 |
+| `UA_FILTER` | 1 | 是否拦截库默认 UA |
+| `UA_BLOCK` | 内置列表 | 自定义 UA 黑名单，逗号分隔 |
 
 ---
 

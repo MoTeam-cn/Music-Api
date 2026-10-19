@@ -13,10 +13,33 @@ export interface Config {
   sourceDisable: string[];
   trustProxy: boolean;
   enableStreamProxy: boolean;
+  requireOrigin: boolean;
+  uaFilter: boolean;
+  uaBlock: string[];
   version: string;
 }
 
 export const VERSION = '0.1.0';
+
+// 常见 HTTP 客户端库默认 UA：直接拦截（curl/wget 保留，便于调试）
+export const DEFAULT_UA_BLOCK = [
+  'okhttp',
+  'python-requests',
+  'python-urllib',
+  'aiohttp',
+  'scrapy',
+  'go-http-client',
+  'java/',
+  'libwww-perl',
+  'node-fetch',
+  'undici',
+  'axios',
+  'postmanruntime',
+  'insomnia',
+  'httpie',
+  'reqwest',
+  'dart:io',
+];
 
 export const NOTICE = 'For technical research and learning only. Public data only. No VIP/paid content, no audio storage, no CORS.';
 
@@ -36,6 +59,15 @@ function boolEnv(env: Record<string, string | undefined>, key: string, def: bool
   const raw = (env[key] ?? '').trim().toLowerCase();
   if (raw === '') return def;
   return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
+
+function listEnv(env: Record<string, string | undefined>, key: string, def: string[]): string[] {
+  const raw = (env[key] ?? '').trim();
+  if (raw === '') return def;
+  return raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
 }
 
 function levelEnv(env: Record<string, string | undefined>): LogLevel {
@@ -59,6 +91,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     sourceDisable: disable,
     trustProxy: boolEnv(env, 'TRUST_PROXY', false),
     enableStreamProxy: boolEnv(env, 'ENABLE_STREAM_PROXY', false),
+    requireOrigin: boolEnv(env, 'ORIGIN_REQUIRED', true),
+    uaFilter: boolEnv(env, 'UA_FILTER', true),
+    uaBlock: listEnv(env, 'UA_BLOCK', DEFAULT_UA_BLOCK),
     version: VERSION,
   };
 }

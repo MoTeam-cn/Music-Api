@@ -78,31 +78,6 @@ async function url(id: string, quality: Quality): Promise<SongUrl> {
   return { source: 'tencent', id, url: sip + purl, quality, bitrate: quality === 'high' ? 320 : 128 };
 }
 
-async function urls(ids: string[], quality: Quality): Promise<Map<string, SongUrl | null>> {
-  const guid = String(Math.floor(Math.random() * 1000000000));
-  const data = await musicu('vkey.GetVkeyServer', 'CgiGetVkey', {
-    guid,
-    songmid: ids,
-    songtype: ids.map(() => 0),
-    uin: '0',
-    loginflag: 1,
-    platform: '20',
-  });
-  const sip = list<string>(data?.sip)[0] ?? 'https://dl.stream.qqmusic.qq.com/';
-  const out = new Map<string, SongUrl | null>();
-  list<any>(data?.midurlinfo).forEach((info: any, index: number) => {
-    const id = str(info?.songmid) || ids[index] || '';
-    if (id === '') return;
-    const purl = str(info?.purl);
-    if (purl === '') {
-      out.set(id, null);
-      return;
-    }
-    out.set(id, { source: 'tencent', id, url: sip + purl, quality, bitrate: quality === 'high' ? 320 : 128 });
-  });
-  return out;
-}
-
 async function lyric(id: string): Promise<Lyric> {
   const data = await requestJson<any>(C + '/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=' + encodeURIComponent(id) + '&format=json&nobase64=1', {
     headers: { ...HEADERS, Referer: 'https://y.qq.com/portal/player.html' },

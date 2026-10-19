@@ -17,8 +17,6 @@ export interface Song {
   cover?: string;
   available: boolean;
   vip: boolean;
-  /** 仅 playlist?with_url=1 时填充；不可播为 null */
-  url?: string | null;
 }
 
 export interface SongDetail extends Song {

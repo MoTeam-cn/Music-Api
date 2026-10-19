@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+.npm-cache
+docs
+test
+tools
+*.md
+LICENSE
+.gitignore
+.gitattributes
+docker-compose.yml

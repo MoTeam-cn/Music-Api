@@ -187,6 +187,55 @@ JSONP 模式下 HTTP 恒为 `200`（`<script>` 不看状态码），错误只看
 
 ---
 
+## Docker 部署
+
+镜像发布在 GHCR：`ghcr.io/moteam-cn/music-api`，多架构（`linux/amd64` + `linux/arm64`），无运行时依赖，镜像约 60MB。
+
+> 仓库与镜像当前均为**私有**，拉取前先登录 GHCR（PAT 需要 `read:packages` 权限）：
+>
+> ```bash
+> echo $CR_PAT | docker login ghcr.io -u <你的GitHub用户名> --password-stdin
+> ```
+
+### 直接运行
+
+```bash
+docker run -d \
+  --name music-api \
+  --restart unless-stopped \
+  -p 8802:8802 \
+  -e HOST=0.0.0.0 \
+  ghcr.io/moteam-cn/music-api:latest
+```
+
+### docker compose
+
+仓库自带 `docker-compose.yml`：
+
+```bash
+docker compose up -d
+docker compose logs -f
+```
+
+### 本地构建
+
+```bash
+docker build -t music-api .
+docker run --rm -p 8802:8802 -e HOST=0.0.0.0 music-api
+```
+
+### 标签规则
+
+| 触发 | 标签 |
+|---|---|
+| push 到 `main` | `latest`、`main`、`sha-<短哈希>` |
+| 打 tag `v1.2.3` | `1.2.3`、`1.2`、`sha-<短哈希>` |
+| PR | 只构建不推送 |
+
+> 公网部署请务必加访问控制（反代 Basic Auth / 内网），不要裸奔；镜像默认监听 `0.0.0.0:8802`。
+
+---
+
 ## 目录结构
 
 ```
@@ -201,6 +250,7 @@ src/
 test/        node:test 单测（不联网）
 tools/       probe.ts 上游连通性探针
 docs/        端点实测与设计文档
+Dockerfile / docker-compose.yml / .github/workflows/ghcr.yml  容器化与镜像发布
 ```
 
 ---

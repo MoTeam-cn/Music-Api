@@ -1,4 +1,4 @@
-// HTTP 服务：路由、限流、缓存、JSONP 出口、日志。
+// HTTP 服务：路由、限流、缓存（TTL + LRU + SWR + singleflight）、JSONP 出口、日志。
 
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server } from 'node:http';
@@ -10,8 +10,9 @@ import { TokenBucket } from './http/limit.ts';
 import { createLogger, hashIp } from './http/log.ts';
 import type { Logger } from './http/log.ts';
 import { send, sendRaw } from './http/respond.ts';
+import type { SendOptions } from './http/respond.ts';
 import { createRouter } from './router.ts';
-import type { RouteDef } from './router.ts';
+import type { RouteContext, RouteDef, RouteResult } from './router.ts';
 import { albumRoute } from './route/album.ts';
 import { homeRoute, openapiRoute } from './route/doc.ts';
 import { artistRoute } from './route/artist.ts';
@@ -28,6 +29,9 @@ const TTL_URL = 60000;
 const TTL_LYRIC = 3600000;
 const TTL_STATUS = 5000;
 const TTL_DEFAULT = 300000;
+
+// 过期后仍可继续返回旧值并后台刷新，避免并发打爆上游
+const STALE_WINDOW = 30000;
 
 function routes(): RouteDef[] {
   return [
@@ -54,6 +58,11 @@ function ttlFor(pathname: string): number {
   return TTL_DEFAULT;
 }
 
+function cacheControlFor(ttlMs: number): string {
+  const sec = Math.max(1, Math.floor(ttlMs / 1000));
+  return 'public, max-age=' + sec + ', s-maxage=' + sec + ', stale-while-revalidate=30';
+}
+
 function normalizePath(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith('/')) return pathname.slice(0, -1);
   return pathname;
@@ -77,12 +86,37 @@ function cacheKeyOf(pathname: string, params: URLSearchParams): string {
   return pathname + '?' + entries.map(([key, value]) => key + '=' + value).join('&');
 }
 
+function headerValue(req: IncomingMessage, name: string): string | undefined {
+  const value = req.headers[name];
+  return typeof value === 'string' ? value : undefined;
+}
+
 export function createApp(config: Config): Server {
   const logger: Logger = createLogger(config.logLevel);
   const limiter = new TokenBucket(config.rateLimit + config.rateBurst, config.rateLimit);
   const cache = new TtlCache<unknown>(config.cacheMax);
+  const inflight = new Map<string, Promise<RouteResult>>();
   const router = createRouter(routes());
   const startedAt = Date.now();
+
+  // 同一个 key 的并发请求只打一次上游；结果写缓存后由所有等待者共享
+  function startFetch(cacheKey: string, route: RouteDef, ctx: RouteContext, ttlMs: number): Promise<RouteResult> {
+    const pending = route.handler(ctx);
+    inflight.set(cacheKey, pending);
+    pending
+      .then((result) => {
+        if (result.raw === undefined) {
+          cache.set(cacheKey, { data: result.data, source: result.source }, ttlMs, STALE_WINDOW);
+        }
+      })
+      .catch(() => {
+        cache.delete(cacheKey);
+      })
+      .finally(() => {
+        if (inflight.get(cacheKey) === pending) inflight.delete(cacheKey);
+      });
+    return pending;
+  }
 
   return createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
@@ -90,57 +124,101 @@ export function createApp(config: Config): Server {
     const callback = url.searchParams.get('callback') ?? url.searchParams.get('cb') ?? undefined;
     const ip = clientIp(req, config);
     const ipKey = hashIp(ip);
+    const head = req.method === 'HEAD';
+    const method = head ? 'GET' : (req.method ?? 'GET');
+    const acceptEncoding = headerValue(req, 'accept-encoding');
 
-    function done(code: number, message: string, data: unknown, source: Source | undefined, cost: number): void {
-      send(res, { code, message, data, source, cost }, callback);
-      logger.info('request', { route: pathname, code, ms: Date.now() - startedAt, ip: ipKey });
+    function done(code: number, message: string, data: unknown, source: Source | undefined, cost: number, opts: SendOptions = {}): void {
+      send(res, { code, message, data, source, cost }, callback, { head, acceptEncoding, ...opts });
+      logger.info('request', { route: pathname, code, ms: Date.now() - startedAt, ip: ipKey, cache: opts.cacheState });
+    }
+
+    function fail(code: number, message: string): void {
+      done(code, message, null, undefined, 0, { cacheControl: 'no-store' });
     }
 
     if (!limiter.take(ip)) {
-      done(Code.rate, 'rate limited', null, undefined, 0);
+      fail(Code.rate, 'rate limited');
       return;
     }
 
-    const match = router.resolve(req.method ?? 'GET', pathname);
+    const match = router.resolve(method, pathname);
     if (match.kind === 'notFound') {
-      done(Code.notFound, 'not found', null, undefined, 0);
+      fail(Code.notFound, 'not found');
       return;
     }
     if (match.kind === 'methodNotAllowed') {
-      done(Code.method, 'method not allowed', null, undefined, 0);
+      fail(Code.method, 'method not allowed');
       return;
     }
 
-    const useCache = match.route.raw !== true;
-    const cacheKey = cacheKeyOf(pathname, url.searchParams);
-    if (useCache) {
-      const cached = cache.get(cacheKey) as { data: unknown; source?: Source } | undefined;
-      if (cached !== undefined) {
-        done(0, 'ok', cached.data, cached.source, 0);
-        return;
-      }
+    const ctx: RouteContext = { query: url.searchParams, config, cache, startedAt };
+
+    if (match.route.raw === true) {
+      const rawStarted = Date.now();
+      match.route
+        .handler(ctx)
+        .then((result) => {
+          if (result.raw === undefined) {
+            fail(Code.internal, 'invalid raw response');
+            return;
+          }
+          sendRaw(res, result.raw, {
+            head,
+            acceptEncoding,
+            ifNoneMatch: headerValue(req, 'if-none-match'),
+            ifModifiedSince: headerValue(req, 'if-modified-since'),
+          });
+          logger.info('request', { route: pathname, code: 0, ms: Date.now() - rawStarted, ip: ipKey, cache: 'STATIC' });
+        })
+        .catch((err: unknown) => {
+          logger.error('raw failed', { route: pathname, message: err instanceof Error ? err.message : String(err) });
+          fail(Code.internal, 'internal error');
+        });
+      return;
     }
 
-    const started = Date.now();
-    match.route
-      .handler({ query: url.searchParams, config, cache, startedAt })
+    const ttl = ttlFor(pathname);
+    const cacheKey = cacheKeyOf(pathname, url.searchParams);
+    const cacheControl = cacheControlFor(ttl);
+    const entry = cache.getWithMeta(cacheKey) as { value: { data: unknown; source?: Source }; stale: boolean } | undefined;
+
+    if (entry !== undefined) {
+      const cached = entry.value;
+      if (entry.stale) {
+        // 先返回旧值，后台刷新（失败则丢弃旧值，下次请求重新取）
+        startFetch(cacheKey, match.route, ctx, ttl).catch(() => cache.delete(cacheKey));
+      }
+      done(0, 'ok', cached.data, cached.source, 0, {
+        cacheControl,
+        cacheState: entry.stale ? 'STALE' : 'HIT',
+      });
+      return;
+    }
+
+    const fetchStarted = Date.now();
+    const existing = inflight.get(cacheKey);
+    const pending = existing ?? startFetch(cacheKey, match.route, ctx, ttl);
+    const shared = existing !== undefined;
+
+    pending
       .then((result) => {
         if (result.raw !== undefined) {
-          sendRaw(res, result.raw);
-          logger.info('request', { route: pathname, code: 0, ms: Date.now() - started, ip: ipKey });
+          fail(Code.internal, 'invalid response');
           return;
         }
-        if (useCache) cache.set(cacheKey, { data: result.data, source: result.source }, ttlFor(pathname));
-        done(0, 'ok', result.data, result.source, Date.now() - started);
+        done(0, 'ok', result.data, result.source, shared ? 0 : Date.now() - fetchStarted, {
+          cacheControl,
+          cacheState: shared ? 'SHARED' : 'MISS',
+        });
       })
       .catch((err: unknown) => {
         if (isAppError(err)) {
-          done(err.code, err.message, null, undefined, Date.now() - started);
+          done(err.code, err.message, null, undefined, Date.now() - fetchStarted, { cacheControl: 'no-store' });
           return;
         }
         logger.error('unhandled', { route: pathname, message: err instanceof Error ? err.message : String(err) });
-        const appErr = new AppError(Code.internal, 'internal error');
-        done(appErr.code, appErr.message, null, undefined, Date.now() - started);
+        fail(Code.internal, 'internal error');
       });
   });
 }

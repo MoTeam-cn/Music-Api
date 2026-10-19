@@ -174,6 +174,37 @@ JSONP 模式下 HTTP 恒为 `200`（`<script>` 不看状态码），错误只看
 
 ---
 
+## 缓存与性能
+
+目标：同一查询在 TTL 内**不再打上游**，并发请求也只打一次。
+
+### 服务端
+
+- **TTL + LRU**：默认 500 条，过期即失效；命中时 `cost` 为 `0`。
+- **stale-while-revalidate**：过期后 30 秒内先返回旧值、后台刷新，避免抖动与并发打爆上游。
+- **singleflight**：同一 key 的并发未命中只发起一次上游请求，其余请求共享结果（`X-Cache: SHARED`）。
+- **错误不缓存**：失败响应直接透传，不写缓存。
+
+| 接口 | TTL |
+|---|---|
+| `/v1/search`、`/v1/song/url` | 60s |
+| `/v1/status`、`/v1/source` | 5s |
+| `/v1/lyric` | 1h |
+| 其余（song/album/artist/playlist/rank） | 5min |
+
+### HTTP / CDN
+
+- API 响应带 `Cache-Control: public, max-age=<ttl>, s-maxage=<ttl>, stale-while-revalidate=30`。
+- `X-Cache` 头：`HIT` / `MISS` / `STALE` / `SHARED` / `STATIC`，便于排查。
+- `/openapi.json`：`public, max-age=3600, s-maxage=86400`，带强 `ETag` + `Last-Modified`，支持 `304`。
+- `/` 首页：`public, max-age=600, s-maxage=3600`，同样支持 `ETag` / `304`。
+- 所有响应声明 `Vary: Accept-Encoding`；大于 1KB 的响应自动 gzip。
+- 支持 `HEAD` 请求（CDN 探活/预检）。
+
+> 走 CDN 时直接按 `s-maxage` 缓存即可；源站还有一层进程内缓存兜底，重复请求不会穿透到上游。
+
+---
+
 ## 部署建议（重要）
 
 本项目设计为**自建自用**，不建议公开部署成公共音乐服务。若要放到服务器上：
@@ -266,7 +297,7 @@ Dockerfile / docker-compose.yml / .github/workflows/ghcr.yml  容器化与镜像
 ```bash
 npm start          # 启动
 npm run dev        # 热重载
-npm test           # 26 项单测，不联网
+npm test           # 30 项单测，不联网
 npm run check      # tsc --noEmit
 npm run probe      # 打真网探测四源能力（需要网络）
 ```

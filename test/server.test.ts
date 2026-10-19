@@ -101,6 +101,67 @@ test('home page and openapi are served raw without cors', async () => {
   }
 });
 
+test('api responses carry cache headers and x-cache states', async () => {
+  const app = await start();
+  try {
+    const first = await fetch(app.base + '/v1/status');
+    assert.equal(first.headers.get('x-cache'), 'MISS');
+    assert.match(first.headers.get('cache-control') ?? '', /public, max-age=\d+/);
+
+    const second = await fetch(app.base + '/v1/status');
+    assert.equal(second.headers.get('x-cache'), 'HIT');
+    const body: any = await second.json();
+    assert.equal(body.cost, 0);
+
+    const err = await fetch(app.base + '/v1/status?x=1', { method: 'POST' });
+    assert.equal(err.status, 405);
+    assert.equal(err.headers.get('cache-control'), 'no-store');
+  } finally {
+    await app.close();
+  }
+});
+
+test('static docs support etag, 304 and head', async () => {
+  const app = await start();
+  try {
+    const spec = await fetch(app.base + '/openapi.json');
+    assert.equal(spec.status, 200);
+    const etag = spec.headers.get('etag');
+    assert.ok(etag !== null);
+    assert.match(spec.headers.get('cache-control') ?? '', /s-maxage=86400/);
+    assert.ok(spec.headers.get('last-modified') !== null);
+    assert.equal(spec.headers.get('vary'), 'Accept-Encoding');
+
+    const cached = await fetch(app.base + '/openapi.json', { headers: { 'if-none-match': etag ?? '' } });
+    assert.equal(cached.status, 304);
+    assert.equal(await cached.text(), '');
+
+    const head = await fetch(app.base + '/', { method: 'HEAD' });
+    assert.equal(head.status, 200);
+    assert.ok(Number(head.headers.get('content-length')) > 0);
+    assert.equal(await head.text(), '');
+  } finally {
+    await app.close();
+  }
+});
+
+test('json and static bodies are gzipped when accepted', async () => {
+  const app = await start();
+  try {
+    const spec = await fetch(app.base + '/openapi.json', { headers: { 'accept-encoding': 'gzip' } });
+    assert.equal(spec.headers.get('content-encoding'), 'gzip');
+    const doc: any = await spec.json();
+    assert.equal(doc.openapi, '3.0.3');
+
+    // 小响应不压缩，但必须声明 Vary，方便 CDN 正确区分
+    const api = await fetch(app.base + '/v1/status', { headers: { 'accept-encoding': 'gzip' } });
+    assert.equal(api.headers.get('vary'), 'Accept-Encoding');
+    assert.equal((await api.json() as any).code, 0);
+  } finally {
+    await app.close();
+  }
+});
+
 test('rate limit returns 429 with code 4001', async () => {
   const app = await start({ RATE_LIMIT: '1', RATE_BURST: '0' });
   try {

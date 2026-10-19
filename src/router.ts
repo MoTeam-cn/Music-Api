@@ -3,6 +3,7 @@
 import type { Config } from './config.ts';
 import type { Source } from './core/model.ts';
 import type { TtlCache } from './http/cache.ts';
+import type { RawResponse } from './http/respond.ts';
 
 export interface RouteContext {
   query: URLSearchParams;
@@ -11,10 +12,7 @@ export interface RouteContext {
   startedAt: number;
 }
 
-export interface RawResult {
-  contentType: string;
-  body: string;
-}
+export type RawResult = RawResponse;
 
 export interface RouteResult {
   data?: unknown;

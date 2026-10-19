@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>music-api v__VERSION__</title>
+</head>
+<body>
+<h1>music-api <small>v__VERSION__</small></h1>
+<p>公开音乐元数据聚合接口：网易云 / QQ 音乐 / 酷狗 / 百度音乐。只读、零依赖、支持 JSONP。</p>
+<p><strong>免责声明</strong>：仅供技术研究与学习。只聚合各平台公开可访问的网页数据，不存储、不转码、不分发音频，不提供 VIP/付费内容，不含登录、破解或绕过版权保护的能力。使用时请遵守所在地区法律与各平台服务条款。</p>
+
+<h2>接口</h2>
+<ul>
+<li><code>GET /v1/search</code> — 搜索，参数 q、source（默认 all）、type（默认 song）、page、size</li>
+<li><code>GET /v1/song</code> — 单曲详情，参数 source、id</li>
+<li><code>GET /v1/song/url</code> — 公开可播直链，参数 source、id、quality</li>
+<li><code>GET /v1/lyric</code> — LRC 歌词，参数 source、id</li>
+<li><code>GET /v1/album</code> — 专辑详情，参数 source、id</li>
+<li><code>GET /v1/artist</code> — 歌手与热门曲目，参数 source、id</li>
+<li><code>GET /v1/playlist</code> — 歌单详情与曲目，参数 source、id</li>
+<li><code>GET /v1/rank</code> — 榜单列表 / 榜单详情，参数 source、id（可省）</li>
+<li><code>GET /v1/source</code> — 四源能力矩阵</li>
+<li><code>GET /v1/status</code> — 版本与运行状态</li>
+<li><code>GET /openapi.json</code> — OpenAPI 3.0 文档</li>
+</ul>
+<p>source 取值：netease / tencent / kugou / baidu；quality 取值：standard / high / lossless。</p>
+
+<h2>示例</h2>
+<p>JSON：</p>
+<pre>GET /v1/search?q=晴天&amp;source=netease&amp;size=5
+GET /v1/playlist?source=netease&amp;id=3778678
+GET /v1/song/url?source=netease&amp;id=2652820720</pre>
+<p>JSONP（浏览器跨域，本服务不设 CORS 头，只能用 JSONP）：</p>
+<pre>&lt;script&gt;
+  function onSearch(res) {
+    if (res.code !== 0) return console.error(res.message);
+    console.log(res.data.list);
+  }
+&lt;/script&gt;
+&lt;script src="/v1/search?q=晴天&amp;source=netease&amp;callback=onSearch"&gt;&lt;/script&gt;</pre>
+<p>jQuery：<code>$.ajax({ url: '/v1/search', dataType: 'jsonp', data: { q: '晴天' } })</code></p>
+
+<h2>响应</h2>
+<pre>{ "code": 0, "message": "ok", "data": {}, "source": "netease", "cost": 137 }</pre>
+<p>错误码：1001 参数 · 1002 源 · 1003 能力 · 1004 方法 · 2001 超时 · 2002 上游 · 2003 解析 · 3001 不存在 · 3002 VIP/付费 · 4001 限流 · 5000 内部。JSONP 模式下 HTTP 恒为 200，错误只看 code。</p>
+
+<h2>说明</h2>
+<ul>
+<li>本项目只提供接口，不含播放器页面，二次开发请自行接入 UI 与播放逻辑。</li>
+<li>VIP / 付费曲目只返回元数据（available=false），取播放地址返回 3002。</li>
+<li>播放直链有时效，拿到后请立即播放，不要持久化。</li>
+<li>完整文档见 <a href="/openapi.json">/openapi.json</a>，免责声明见仓库 DISCLAIMER.md。</li>
+</ul>
+</body>
+</html>

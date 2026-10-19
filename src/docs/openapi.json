@@ -1,0 +1,1133 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "music-api",
+    "version": "0.1.0",
+    "description": "公开音乐元数据聚合接口（网易云 / QQ 音乐 / 酷狗 / 百度音乐）。只读、零运行时依赖、支持 JSONP，不设 CORS。仅供技术研究与学习，不提供 VIP/付费内容。",
+    "license": {
+      "name": "MIT (code only)"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8802",
+      "description": "本地默认"
+    }
+  ],
+  "tags": [
+    {
+      "name": "music"
+    },
+    {
+      "name": "meta"
+    }
+  ],
+  "paths": {
+    "/v1/search": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "搜索歌曲（支持四源聚合）",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "description": "关键词"
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "netease",
+                "tencent",
+                "kugou",
+                "baidu"
+              ]
+            },
+            "description": "音源；all 表示四源并发聚合（仅搜索支持）"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "song"
+              ],
+              "default": "song"
+            },
+            "description": "目前仅实现 song"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
+            },
+            "description": "JSONP 回调名；别名 cb"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPage"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/song": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "单曲详情",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "netease",
+                "tencent",
+                "kugou",
+                "baidu"
+              ]
+            },
+            "description": "音源"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "各源原生 ID（字符串）"
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
+            },
+            "description": "JSONP 回调名；别名 cb"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SongDetail"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/song/url": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "公开可播直链（VIP/付费返回 3002）",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "netease",
+                "tencent",
+                "kugou",
+                "baidu"
+              ]
+            },
+            "description": "音源"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "各源原生 ID（字符串）"
+          },
+          {
+            "name": "quality",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "standard",
+                "high",
+                "lossless"
+              ],
+              "default": "standard"
+            }
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
+            },
+            "description": "JSONP 回调名；别名 cb"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SongUrl"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "仅 VIP / 付费 / 无版权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/lyric": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "LRC 歌词",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "netease",
+                "tencent",
+                "kugou",
+                "baidu"
+              ]
+            },
+            "description": "音源"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "各源原生 ID（字符串）"
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
+            },
+            "description": "JSONP 回调名；别名 cb"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lyric"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "无歌词",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/album": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "专辑详情与曲目",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "netease",
+                "tencent",
+                "kugou",
+                "baidu"
+              ]
+            },
+            "description": "音源"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "各源原生 ID（字符串）"
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
+            },
+            "description": "JSONP 回调名；别名 cb"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumDetail"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "该源不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/artist": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "歌手信息与热门曲目",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "netease",
+                "tencent",
+                "kugou",
+                "baidu"
+              ]
+            },
+            "description": "音源"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "各源原生 ID（字符串）"
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
+            },
+            "description": "JSONP 回调名；别名 cb"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistDetail"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "该源不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/playlist": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "歌单详情与曲目（歌单播放器主接口）",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "netease",
+                "tencent",
+                "kugou",
+                "baidu"
+              ]
+            },
+            "description": "音源"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "各源原生 ID（字符串）"
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
+            },
+            "description": "JSONP 回调名；别名 cb"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistDetail"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "该源不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/rank": {
+      "get": {
+        "tags": [
+          "music"
+        ],
+        "summary": "榜单列表（不带 id）或榜单详情（带 id）",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "netease",
+                "tencent",
+                "kugou",
+                "baidu"
+              ]
+            },
+            "description": "音源"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "callback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*){0,3}$"
+            },
+            "description": "JSONP 回调名；别名 cb"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankResponse"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "该源不支持",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/source": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "四源能力矩阵与禁用列表",
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceInfo"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "版本、运行时长、缓存命中、免责声明摘要",
+        "responses": {
+          "200": {
+            "description": "成功。JSON 模式按 code 映射 HTTP；带 callback 时返回 application/javascript 且 HTTP 恒 200。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusInfo"
+                }
+              },
+              "application/javascript": {
+                "schema": {
+                  "type": "string",
+                  "example": "/**/typeof cb === 'function' && cb({...});"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Envelope": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "data",
+          "cost"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "0 成功；非 0 见错误码"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "cost": {
+            "type": "integer",
+            "description": "上游耗时毫秒，缓存命中为 0"
+          }
+        }
+      },
+      "Song": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "netease",
+              "tencent",
+              "kugou",
+              "baidu"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "artist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "album": {
+            "type": "string"
+          },
+          "albumId": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "秒"
+          },
+          "cover": {
+            "type": "string",
+            "nullable": true
+          },
+          "available": {
+            "type": "boolean",
+            "description": "是否公开可播"
+          },
+          "vip": {
+            "type": "boolean",
+            "description": "是否 VIP/付费（仅提示，不提供地址）"
+          }
+        }
+      },
+      "SongDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Song"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "quality": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "publishAt": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "SongUrl": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "high",
+              "lossless"
+            ]
+          },
+          "bitrate": {
+            "type": "integer",
+            "description": "kbps"
+          },
+          "size": {
+            "type": "integer",
+            "nullable": true
+          },
+          "expireAt": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "Lyric": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lyric": {
+            "type": "string"
+          },
+          "translation": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AlbumDetail": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "artist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cover": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "song": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Song"
+            }
+          }
+        }
+      },
+      "ArtistDetail": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "song": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Song"
+            }
+          }
+        }
+      },
+      "PlaylistDetail": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cover": {
+            "type": "string",
+            "nullable": true
+          },
+          "creator": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer"
+          },
+          "song": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Song"
+            }
+          }
+        }
+      },
+      "RankItem": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cover": {
+            "type": "string",
+            "nullable": true
+          },
+          "updateAt": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RankDetail": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cover": {
+            "type": "string",
+            "nullable": true
+          },
+          "updateAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "song": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Song"
+            }
+          }
+        }
+      },
+      "RankResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "list": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RankItem"
+                }
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/RankDetail"
+          }
+        ]
+      },
+      "SearchPage": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Song"
+            }
+          }
+        }
+      },
+      "SourceInfo": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            }
+          },
+          "disable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "StatusInfo": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "integer"
+          },
+          "cache": {
+            "type": "object"
+          },
+          "notice": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

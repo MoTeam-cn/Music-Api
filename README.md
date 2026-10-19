@@ -191,11 +191,11 @@ JSONP 模式下 HTTP 恒为 `200`（`<script>` 不看状态码），错误只看
 
 镜像发布在 GHCR：`ghcr.io/moteam-cn/music-api`，多架构（`linux/amd64` + `linux/arm64`），无运行时依赖，镜像约 60MB。
 
-> 仓库与镜像当前均为**私有**，拉取前先登录 GHCR（PAT 需要 `read:packages` 权限）：
->
-> ```bash
-> echo $CR_PAT | docker login ghcr.io -u <你的GitHub用户名> --password-stdin
-> ```
+国内推荐用**南京大学 GHCR 镜像**（公开镜像可匿名拉取，无需登录）：
+
+```bash
+docker pull ghcr.nju.edu.cn/moteam-cn/music-api:latest
+```
 
 ### 直接运行
 
@@ -203,10 +203,15 @@ JSONP 模式下 HTTP 恒为 `200`（`<script>` 不看状态码），错误只看
 docker run -d \
   --name music-api \
   --restart unless-stopped \
-  -p 8802:8802 \
+  -p 21983:8802 \
   -e HOST=0.0.0.0 \
-  ghcr.io/moteam-cn/music-api:latest
+  -e TRUST_PROXY=1 \
+  ghcr.nju.edu.cn/moteam-cn/music-api:latest
 ```
+
+宿主机访问 `http://127.0.0.1:21983/`；容器内部始终监听 `8802`，只映射宿主端口。
+
+> 官方地址把 `ghcr.nju.edu.cn` 换成 `ghcr.io` 即可。私有部署建议加反代 Basic Auth / 内网访问，不要裸奔。
 
 ### docker compose
 
@@ -215,13 +220,14 @@ docker run -d \
 ```bash
 docker compose up -d
 docker compose logs -f
+# 默认映射 21983:8802
 ```
 
 ### 本地构建
 
 ```bash
 docker build -t music-api .
-docker run --rm -p 8802:8802 -e HOST=0.0.0.0 music-api
+docker run --rm -p 21983:8802 -e HOST=0.0.0.0 music-api
 ```
 
 ### 标签规则
@@ -232,7 +238,7 @@ docker run --rm -p 8802:8802 -e HOST=0.0.0.0 music-api
 | 打 tag `v1.2.3` | `1.2.3`、`1.2`、`sha-<短哈希>` |
 | PR | 只构建不推送 |
 
-> 公网部署请务必加访问控制（反代 Basic Auth / 内网），不要裸奔；镜像默认监听 `0.0.0.0:8802`。
+> 公网部署请务必加访问控制（反代 Basic Auth / 内网），不要裸奔；容器内监听 `0.0.0.0:8802`，宿主端口由 `-p` 决定（示例 21983）。
 
 ---
 

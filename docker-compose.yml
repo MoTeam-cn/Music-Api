@@ -1,12 +1,12 @@
-# 直接使用 GHCR 镜像；如需本地构建，把 image 换成 build: .
+# 默认走南京大学 GHCR 镜像（国内拉取更快）；官方地址 ghcr.io/moteam-cn/music-api 同样可用。
 services:
   music-api:
-    image: ghcr.io/moteam-cn/music-api:latest
+    image: ghcr.nju.edu.cn/moteam-cn/music-api:latest
     # build: .
     container_name: music-api
     restart: unless-stopped
     ports:
-      - "8802:8802"
+      - "21983:8802"
     environment:
       HOST: 0.0.0.0
       PORT: "8802"

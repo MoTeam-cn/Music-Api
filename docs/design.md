@@ -97,6 +97,10 @@ music-api/
 │   │   ├── tencent.ts      # QQ 音乐
 │   │   ├── kugou.ts        # 酷狗
 │   │   └── baidu.ts        # 百度（experimental）
+│   ├── sdk/
+│   │   ├── music-sdk.js    # 浏览器 SDK 源码（JSONP/缓存/重试/播放）
+│   │   ├── music-sdk.d.ts  # SDK 类型声明
+│   │   └── index.ts        # 装载静态资源（版本注入/ETag）
 │   └── route/
 │       ├── search.ts       # GET /v1/search
 │       ├── song.ts         # GET /v1/song、/v1/song/url
@@ -106,7 +110,8 @@ music-api/
 │       ├── playlist.ts     # GET /v1/playlist
 │       ├── rank.ts         # GET /v1/rank
 │       ├── source.ts       # GET /v1/source（能力矩阵 + 健康）
-│       └── status.ts       # GET /v1/status（版本/运行态/免责摘要）
+│       ├── status.ts       # GET /v1/status（版本/运行态/免责摘要）
+│       └── sdk.ts          # GET /sdk.js、/sdk.d.ts（浏览器 SDK 静态资源）
 ├── test/
 │   ├── router.test.ts
 │   ├── respond.test.ts
@@ -139,6 +144,8 @@ music-api/
 | GET | `/v1/rank` | `source`、`id`（可省） | 榜单列表 / 榜单详情 |
 | GET | `/v1/source` | — | 四源能力矩阵、健康状态、禁用列表 |
 | GET | `/v1/status` | — | 版本、uptime、缓存命中率、免责声明摘要 |
+| GET | `/sdk.js` | — | 浏览器 SDK（JSONP 封装，见 6.4） |
+| GET | `/sdk.d.ts` | — | SDK 的 TypeScript 类型声明 |
 
 路由规则：
 
@@ -281,6 +288,65 @@ Cache-Control: no-store
 jQuery：`$.ajax({ url: '.../v1/search', dataType: 'jsonp', data: { q: '晴天' } })`（默认回调参数名就是 `callback`，可直接用）。
 
 安全边界：JSONP 等于把响应交给任意页面执行，所以**只返回只读数据、不返回任何凭据**；这也正是本服务不持有账号、不接受 Cookie 的前提。
+
+---
+
+### 6.4 浏览器 SDK（`/sdk.js`）
+
+**要解决的问题**：JSONP 是唯一跨域方案，但手写要处理「唯一回调名 → 挂 window → 建 script → 超时 → 清理 → 错误分支」，每个调用点重复一遍，还容易漏清理造成全局污染。
+
+**方案**：服务端直接托管一个零依赖经典脚本 `GET /sdk.js`，把传输与调用约定收进 SDK；服务端契约不变（只读 GET、envelope、JSONP）。
+
+```
+GET /sdk.js      text/javascript   源码 src/sdk/music-sdk.js，版本号启动时注入
+GET /sdk.d.ts    text/plain        TypeScript 类型声明
+```
+
+两者都是 `raw` 路由（不包 envelope、不校验 origin、不受业务缓存影响），带 `ETag` / `Last-Modified` / `304`，`Cache-Control: public, max-age=300, s-maxage=3600, stale-while-revalidate=86400`。
+
+SDK 内部分层：
+
+| 层 | 职责 |
+|---|---|
+| 环境探测 | 从 `document.currentScript.src` 推导 `baseUrl`，从 `location.hostname` 推导 `origin`，读取 `script data-* 属性` 覆盖默认值 |
+| 传输 | JSONP：唯一回调名 `__music_api_cb_<n>_<rand>`、`script.onerror/onload`、超时定时器、`AbortSignal`、finally 式清理 |
+| 调用层 | 参数排序编码（与服务端缓存键一致）、`origin` 注入、必填参数本地校验、envelope 解包、`MusicApiError` |
+| 增强 | 客户端 TTL+LRU 缓存（与服务端同 TTL）、in-flight 去重、仅对 9001/9002 重试、`onRequest/onResponse/onError` 钩子 |
+| 便捷 | `search` / `song` / `songUrl` / `lyric` / `album` / `artist` / `playlist` / `rank` / `sources` / `status` / `play` / `request` |
+
+对外参数（`create` / `configure` / 单次调用）：
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `baseUrl` | 脚本地址推导 | 接口根地址 |
+| `origin` | `location.hostname` / `web` | 服务端必填来源 |
+| `source` | `netease` | 非搜索接口默认音源 |
+| `quality` | 不传（服务端 `standard`） | 取地址默认音质 |
+| `timeout` | `15000` | 单次超时 |
+| `retries` | `0` | 仅 9001/9002 重试 |
+| `cache` / `cacheSize` / `cacheTtl` | `true` / `200` / 内置 | 客户端缓存 |
+| `throwOnError` | `true` | 业务错误 reject 或 resolve |
+| `noCache` | `false` | 追加时间戳穿透服务端缓存 |
+| `signal` | — | 取消请求 |
+| `onRequest` / `onResponse` / `onError` | — | 调试钩子 |
+
+SDK 侧错误码（服务端业务码原样透传）：
+
+| code | 含义 |
+|---|---|
+| 9001 | 请求超时 |
+| 9002 | 脚本加载失败 / 空响应 / 非法 envelope |
+| 9003 | 被 AbortSignal 取消 |
+| 9004 | 本地参数校验失败 |
+| 9005 | 运行环境不支持（无 document / Audio） |
+
+边界：
+
+- 只支持经典 `script 标签`；ESM `import` 跨域需要 CORS，与本服务「不设 CORS」冲突，不提供。
+- 不做换源兜底、不缓存音频、不代理播放、不提供 UI；`play()` 只负责取直链并创建 `Audio`。
+- 传输层仍是 JSONP，因此只有 GET；这与「全 GET」的刻意约束一致。
+
+测试：`test/sdk.test.ts` 用 `node:vm` + 极简 DOM 桩直接执行真实 `music-sdk.js`，覆盖环境探测、属性覆盖、参数序列化、回调清理、缓存命中、并发去重、超时、网络错误重试、取消、错误码与钩子；`test/sdk-e2e.test.ts` 再起真实 HTTP 服务，把返回的 JSONP 脚本真正执行，验证 SDK ↔ 服务端契约（均不联网）。
 
 ---
 

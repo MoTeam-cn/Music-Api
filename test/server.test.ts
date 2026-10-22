@@ -165,9 +165,49 @@ test('json and static bodies are gzipped when accepted', async () => {
     const doc: any = await spec.json();
     assert.equal(doc.openapi, '3.0.3');
 
+    const sdk = await fetch(app.base + '/sdk.js', { headers: { 'accept-encoding': 'gzip', 'user-agent': UA } });
+    assert.equal(sdk.headers.get('content-encoding'), 'gzip');
+    assert.ok((await sdk.text()).includes('MusicApi'));
+
     const apiRes = await api(app, '/v1/status', { headers: { 'accept-encoding': 'gzip' } });
     assert.equal(apiRes.headers.get('vary'), 'Accept-Encoding');
     assert.equal((await apiRes.json() as any).code, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+test('browser sdk and typings are served raw with etag and no cors', async () => {
+  const app = await start();
+  try {
+    const sdk = await fetch(app.base + '/sdk.js', { headers: { 'user-agent': UA } });
+    assert.equal(sdk.status, 200);
+    assert.ok((sdk.headers.get('content-type') ?? '').startsWith('text/javascript'));
+    assert.equal(sdk.headers.get('access-control-allow-origin'), null);
+    assert.match(sdk.headers.get('cache-control') ?? '', /s-maxage=3600/);
+    assert.equal(sdk.headers.get('vary'), 'Accept-Encoding');
+    const body = await sdk.text();
+    assert.ok(body.includes('root.MusicApi = api'));
+    assert.ok(body.includes('__music_api_cb_'));
+    assert.ok(body.includes("var VERSION = '0.2.0'"));
+    assert.ok(!body.includes('__VERSION__'));
+
+    const etag = sdk.headers.get('etag');
+    assert.ok(etag !== null);
+    const cached = await fetch(app.base + '/sdk.js', { headers: { 'user-agent': UA, 'if-none-match': etag ?? '' } });
+    assert.equal(cached.status, 304);
+    assert.equal(await cached.text(), '');
+
+    const types = await fetch(app.base + '/sdk.d.ts', { headers: { 'user-agent': UA } });
+    assert.equal(types.status, 200);
+    assert.ok((types.headers.get('content-type') ?? '').startsWith('text/plain'));
+    const typesBody = await types.text();
+    assert.ok(typesBody.includes('interface MusicApiClient'));
+    assert.ok(typesBody.includes('interface ClientOptions'));
+    assert.ok(!typesBody.includes('__VERSION__'));
+
+    const home = await fetch(app.base + '/');
+    assert.ok((await home.text()).includes('/sdk.js'));
   } finally {
     await app.close();
   }

@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "music-api",
-    "version": "0.1.0",
-    "description": "公开音乐元数据聚合接口（网易云 / QQ 音乐 / 酷狗 / 百度音乐）。只读、零运行时依赖、支持 JSONP，不设 CORS。所有 /v1 接口必须携带 origin；常见 HTTP 库默认 UA 会被拦截。仅供技术研究与学习，不提供 VIP/付费内容。",
+    "version": "0.2.0",
+    "description": "公开音乐元数据聚合接口（网易云 / QQ 音乐 / 酷狗 / 百度音乐）。只读、零运行时依赖、支持 JSONP，不设 CORS。所有 /v1 接口必须携带 origin；常见 HTTP 库默认 UA 会被拦截。浏览器接入用 /sdk.js（JSONP 封装，内置超时/缓存/重试/播放便捷方法）。仅供技术研究与学习，不提供 VIP/付费内容。",
     "license": {
       "name": "MIT (code only)"
     }

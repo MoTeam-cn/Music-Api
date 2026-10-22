@@ -1,9 +1,9 @@
 {
   "name": "music-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "公开音乐元数据聚合接口（网易云 / QQ 音乐 / 酷狗 / 百度音乐）。只读、零运行时依赖、支持 JSONP。仅供学习研究，请勿用于商业用途。",
+  "description": "公开音乐元数据聚合接口（网易云 / QQ 音乐 / 酷狗 / 百度音乐）。只读、零运行时依赖、支持 JSONP，自带浏览器 SDK（/sdk.js）。仅供学习研究，请勿用于商业用途。",
   "keywords": [
     "music-api",
     "netease",
@@ -12,7 +12,9 @@
     "baidu-music",
     "typescript",
     "nodejs",
-    "jsonp"
+    "jsonp",
+    "sdk",
+    "browser"
   ],
   "homepage": "https://github.com/MoTeam-cn/Music-Api",
   "repository": {

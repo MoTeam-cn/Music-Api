@@ -43,6 +43,20 @@ GET /v1/song/url?source=netease&amp;id=2652820720&amp;origin=web</pre>
 &lt;script src="/v1/search?q=晴天&amp;source=netease&amp;callback=onSearch&amp;origin=web"&gt;&lt;/script&gt;</pre>
 <p>jQuery：<code>$.ajax({ url: '/v1/search', dataType: 'jsonp', data: { q: '晴天', origin: 'web' } })</code></p>
 
+<h2>浏览器 SDK（推荐）</h2>
+<p>一个 <code>&lt;script&gt;</code> 引入，SDK 自动处理 JSONP、超时、缓存、去重、参数校验与播放，调用方不用自己拼回调：</p>
+<pre>&lt;script src="/sdk.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  MusicApi.search({ q: '晴天', source: 'netease', size: 5 })
+    .then(function (res) { console.log(res.data.list); })
+    .catch(function (err) { console.error(err.code, err.message); });
+
+  MusicApi.playlist({ source: 'netease', id: '3778678', page: 1, size: 50 })
+    .then(function (res) { return MusicApi.play(res.data.song[0]); });
+&lt;/script&gt;</pre>
+<p>可配置参数（<code>&lt;script data-*&gt;</code> 属性或 <code>MusicApi.configure()</code>）：<code>baseUrl</code>、<code>origin</code>、<code>source</code>、<code>quality</code>、<code>timeout</code>、<code>retries</code>、<code>cache</code>、<code>cacheTtl</code>、<code>throwOnError</code>、<code>signal</code>、<code>onRequest</code> / <code>onResponse</code> / <code>onError</code>。</p>
+<p>方法：<code>search</code> / <code>song</code> / <code>songUrl</code> / <code>lyric</code> / <code>album</code> / <code>artist</code> / <code>playlist</code> / <code>rank</code> / <code>sources</code> / <code>status</code> / <code>play</code>；类型声明见 <a href="/sdk.d.ts">/sdk.d.ts</a>，完整文档见仓库 <code>docs/sdk.md</code>。</p>
+
 <h2>响应</h2>
 <pre>{ "code": 0, "message": "ok", "data": {}, "source": "netease", "cost": 137 }</pre>
 <p>错误码：1001 参数 · 1002 源 · 1003 能力 · 1004 方法 · 2001 超时 · 2002 上游 · 2003 解析 · 3001 不存在 · 3002 VIP/付费 · 4001 限流 · 4002 UA 被拦截 · 5000 内部。JSONP 模式下 HTTP 恒为 200，错误只看 code。</p>

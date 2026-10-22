@@ -11,7 +11,7 @@
 
 ![license](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![node](https://img.shields.io/badge/node-%3E%3D24-brightgreen)
-![tests](https://img.shields.io/badge/tests-33%20passing-success)
+![tests](https://img.shields.io/badge/tests-55%20passing-success)
 
 ---
 
@@ -20,6 +20,7 @@
 - **四源统一模型**：搜索、详情、歌词、专辑、歌手、歌单、榜单、播放地址，字段一致。
 - **只读、全 GET**：无写操作、无账号、无 Cookie 透传。
 - **JSONP**：`?callback=cb` 返回脚本，浏览器 `<script>` 直接跨域取数；**不设任何 CORS 头**。
+- **浏览器 SDK**：`GET /sdk.js` 一个 `<script>` 引入，内置 JSONP 传输、超时重试、客户端缓存、并发去重、参数校验与播放便捷方法，调用方不用自己拼回调。
 - **合规过滤**：VIP / 付费 / 无版权曲目只返回元数据并标 `available:false`，取播放地址一律 `3002`，不做换源兜底。
 - **零依赖**：运行时只用 Node 内置模块，无构建步骤、无数据库。
 - **工程件**：TTL + LRU 缓存、令牌桶限流、上游超时重试、域名白名单、IP 哈希日志。
@@ -35,7 +36,7 @@
 git clone https://github.com/MoTeam-cn/Music-Api.git
 cd Music-Api
 npm start
-# music-api 0.1.0 listening on http://127.0.0.1:8802
+# music-api 0.2.0 listening on http://127.0.0.1:8802
 ```
 
 浏览器打开 `http://127.0.0.1:8802/` 可看到接口说明页。
@@ -149,6 +150,31 @@ jQuery 直接可用：`$.ajax({ url: '/v1/search', dataType: 'jsonp', data: { q:
 
 > 本服务不设 CORS 头，跨域只能用 JSONP。回调名有白名单校验，非法回调返回 `1001`。
 
+### 浏览器 SDK（推荐）
+
+不想自己拼 JSONP 时，直接引入 SDK（接口服务自带托管）：
+
+```html
+<script src="https://your-music-api.example.com/sdk.js"></script>
+<script>
+  MusicApi.search({ q: '晴天', source: 'netease', size: 5 })
+    .then(function (res) { console.log(res.data.list); })
+    .catch(function (err) { console.error(err.code, err.message); });
+
+  // 歌单 → 过滤 → 播放
+  MusicApi.playlist({ source: 'netease', id: '3778678', page: 1, size: 50 })
+    .then(function (res) {
+      var song = res.data.song.filter(function (s) { return s.available && !s.vip; })[0];
+      return MusicApi.play(song, { volume: 0.8 });
+    });
+</script>
+```
+
+- 方法：`search` / `song` / `songUrl`（别名 `url`）/ `lyric` / `album` / `artist` / `playlist` / `rank` / `sources` / `status` / `play` / `request`。
+- 参数：`baseUrl`、`origin`、`source`、`quality`、`timeout`、`retries`、`cache`、`cacheSize`、`cacheTtl`、`throwOnError`、`noCache`、`signal`、`onRequest` / `onResponse` / `onError`；可用 `<script data-*>` 属性预置。
+- `baseUrl` 默认从脚本地址推导，`origin` 默认取站点域名，通常**零配置**即可用。
+- 类型声明：`GET /sdk.d.ts`；完整文档：[docs/sdk.md](docs/sdk.md)。
+
 ---
 
 ## 响应格式
@@ -191,7 +217,10 @@ JSONP 模式下 HTTP 恒为 `200`（`<script>` 不看状态码），错误只看
 ## 文档与调试
 
 - `GET /`：默认说明页（纯 HTML、无样式）
+- `GET /sdk.js`：浏览器 SDK（JSONP 封装，带 ETag / 304）
+- `GET /sdk.d.ts`：SDK 的 TypeScript 类型声明
 - `GET /openapi.json`：OpenAPI 3.0 规范，可导入 **Apifox / Postman / Swagger Editor**
+- `docs/sdk.md`：SDK 参数、方法、错误码与示例
 - `docs/endpoint.md`：四源端点实测记录（含签名算法与已知坑）
 - `docs/design.md`：设计与实现说明
 
@@ -325,7 +354,8 @@ src/
   core/      model / error / normalize
   http/      upstream / respond / request / cache / limit / log
   provider/  netease / tencent / kugou / baidu / index / types
-  route/     search / song / lyric / album / artist / playlist / rank / source / status / doc
+  route/     search / song / lyric / album / artist / playlist / rank / source / status / doc / sdk
+  sdk/       music-sdk.js 浏览器 SDK 源码  music-sdk.d.ts 类型声明  index.ts 静态资源装载
   web/       home.html 默认说明页
   docs/      openapi.json OpenAPI 规范
 test/        node:test 单测（不联网）
@@ -341,7 +371,7 @@ Dockerfile / docker-compose.yml / .github/workflows/ghcr.yml  容器化与镜像
 ```bash
 npm start          # 启动
 npm run dev        # 热重载
-npm test           # 33 项单测，不联网
+npm test           # 55 项单测，不联网（含 SDK 的 vm + DOM 桩测试与真实服务端 e2e）
 npm run check      # tsc --noEmit
 npm run probe      # 打真网探测四源能力（需要网络）
 ```
@@ -371,6 +401,7 @@ npm run probe      # 打真网探测四源能力（需要网络）
 - 酷狗榜单/歌单/专辑走 `mobilecdn.kugou.com` 的 HTTP（该域名 HTTPS 证书不匹配）。
 - 网易未登录通常只能取 128k；QQ/酷狗/百度直链均有时效。
 - 上游接口随时可能变更，失效能力会降级为 `1003` / `2002`。
+- SDK 只支持经典 `<script>` 引入；ESM `import` 需要 CORS，与本服务策略冲突，不提供。
 
 ---
 

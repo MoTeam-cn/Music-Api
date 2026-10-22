@@ -19,6 +19,7 @@ import { artistRoute } from './route/artist.ts';
 import { lyricRoute } from './route/lyric.ts';
 import { playlistRoute } from './route/playlist.ts';
 import { rankRoute } from './route/rank.ts';
+import { sdkRoute, sdkTypesRoute } from './route/sdk.ts';
 import { searchRoute } from './route/search.ts';
 import { songRoute, songUrlRoute } from './route/song.ts';
 import { sourceRoute } from './route/source.ts';
@@ -39,6 +40,8 @@ function routes(): RouteDef[] {
   return [
     { path: '/', handler: homeRoute, raw: true },
     { path: '/openapi.json', handler: openapiRoute, raw: true },
+    { path: '/sdk.js', handler: sdkRoute, raw: true },
+    { path: '/sdk.d.ts', handler: sdkTypesRoute, raw: true },
     { path: '/v1/search', handler: searchRoute },
     { path: '/v1/song', handler: songRoute },
     { path: '/v1/song/url', handler: songUrlRoute },

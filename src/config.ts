@@ -19,7 +19,7 @@ export interface Config {
   version: string;
 }
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 
 // 常见 HTTP 客户端库默认 UA：直接拦截（curl/wget 保留，便于调试）
 export const DEFAULT_UA_BLOCK = [
